@@ -1,10 +1,15 @@
 # Aether-HIL: Real-Time Hardware-in-the-Loop Diagnostic Matrix & Control Plaza
 
+<img width="1594" height="744" alt="aether-hil-screenshot" src="https://github.com/user-attachments/assets/a687d052-0965-4b10-84bf-49a96e7b3b8e" />
+
+
+
 A highly concurrent, event-driven Full-Stack Hardware-in-the-Loop (HIL) prototype dashboard designed to stream, monitor, and algorithmically analyze real-time video frames from connected Android device clusters at a crisp ~30Hz pacing. 
 
 This project is a functional **Capability Showcase / Concept Demonstration** built to highlight advanced software architecture, computer vision metrics manipulation, and low-level system automation pipelines. It is explicitly not intended for hardened corporate production.
 
 ---
+
 
 ## 🛠️ System Architecture & Engineering Highlights
 
