@@ -18,7 +18,7 @@ This project is a functional **Capability Showcase / Concept Demonstration** bui
 ## 🚀 Getting Started
 
 ### Prerequisites
-1. **Python 3.8+** installed on your host machine.
+1. **Python 3.14** installed on your host machine.
 2. **Android SDK Platform Tools (ADB)** installed and globally accessible in your system's PATH.
 3. One or more Android physical devices or emulators attached via USB with **USB Debugging enabled**.
 
