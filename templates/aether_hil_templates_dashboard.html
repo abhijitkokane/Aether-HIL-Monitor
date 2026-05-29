@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Aether-HIL Master Triage Panel</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        .danger-border-red { 
+            border: 3px solid #f56565 !important; 
+            box-shadow: 0 0 15px rgba(245, 101, 101, 0.5); 
+        }
+        .danger-border-yellow { 
+            border: 3px solid #d97706 !important; 
+            box-shadow: 0 0 15px rgba(217, 119, 6, 0.5); 
+        }
+        .device-card { 
+            transition: all 0.2s ease-in-out; 
+        }
+    </style>
+</head>
+<body class="bg-gray-900 text-gray-100 font-sans min-h-screen">
+
+    <div class="container mx-auto px-4 py-8">
+
+        <div class="flex justify-between items-center mb-8 border-b border-gray-700 pb-4">
+            <div>
+                <h1 class="text-3xl font-extrabold tracking-tight text-white flex items-center">
+                    Aether-HIL <span class="text-blue-500 ml-2 text-xl font-mono px-2 py-1 bg-gray-800 rounded">v1.0-30Hz</span>
+                </h1>
+                <p class="text-gray-400 mt-1">Real-Time Concurrency Execution Matrix & Hardware-in-the-Loop Diagnostic Rig</p>
+            </div>
+            <button onclick="triggerSimulation()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded shadow-md transform active:scale-95 transition">
+                Pulse Synchronous Simulation
+            </button>
+        </div>
+
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div id="card-container-oled" class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-lg transition-all duration-200">
+                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Panel Array Health Monitoring</h3>
+                <div id="oled-health-panel" class="text-sm font-medium text-gray-200">
+                    <span class='text-green-400 font-bold'>✔</span> All active OLED array panels within nominal parameters.
+                </div>
+            </div>
+
+            <div id="card-container-driver" class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-lg transition-all duration-200">
+                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">OS Render Driver Integrity</h3>
+                <div id="driver-integrity-panel" class="text-sm font-medium text-gray-200">
+                    <span class='text-green-400 font-bold'>✔</span> All active hardware rendering planes reporting operational driver states.
+                </div>
+            </div>
+
+            <div id="card-container-frame" class="bg-gray-800 p-5 rounded-lg border border-gray-700 shadow-lg transition-all duration-200">
+                <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Frame Delta Continuity</h3>
+                <div id="frame-continuity-panel" class="text-sm font-medium text-gray-200">
+                    Tracking frame-differencing velocity loops... <span class='text-green-400 font-bold'>Nominal</span>
+                </div>
+            </div>
+        </div>
+
+
+        <h2 class="text-xl font-bold mb-4 text-gray-300 flex items-center">
+            Active Hardware Cluster Node Grid 
+            <span id="node-count" class="ml-2 bg-gray-700 text-xs text-white px-2 py-0.5 rounded-full">0 Nodes</span>
+        </h2>
+        
+        <div id="device-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            </div>
+
+    </div>
+
+    <script>
+        const socket = io();
+        const activeNodeSerials = new Set();
+
+
+        // =====================================================================
+        // =====================================================================
+        function triggerSimulation() {
+            fetch('/api/launch_simulation')
+                .then(res => res.json())
+                .then(data => console.log("[AM BROADCAST] Pulse complete:", data));
+        }
+
+
+        // =====================================================================
+        // =====================================================================
+        socket.on('telemetry_update', (DEVICE_TELEMETRY) => {
+            const gridContainer = document.getElementById("device-grid");
+            const nodeIds = Object.keys(DEVICE_TELEMETRY);
+            
+            // Sync Device Matrix Node Count Ticker
+            document.getElementById("node-count").innerText = `${nodeIds.length} Node${nodeIds.length !== 1 ? 's' : ''}`;
+
+            // --- 1. INITIALIZE SYSTEM MULTI-FAULT TRACKING REPOSITORIES ---
+            let overheatingNodes = [];
+            let driverFaultNodes = [];
+            let frozenNodes = [];
+
+            // --- 2. GARBAGE COLLECTION: PRUNE DISCONNECTED USB NODES FROM DOM ---
+            activeNodeSerials.forEach(trackedSerial => {
+                if (!DEVICE_TELEMETRY[trackedSerial]) {
+                    const deadCard = document.getElementById(`card-${trackedSerial}`);
+                    if (deadCard) deadCard.remove();
+                    activeNodeSerials.delete(trackedSerial);
+                    console.log(`[DOM GC] Pruned unplugged element node mapping: ${trackedSerial}`);
+                }
+            });
+
+            // --- 3. TELEMETRY PARSING & FAULT AGGREGATION LOOP ---
+            nodeIds.forEach(deviceId => {
+                const device = DEVICE_TELEMETRY[deviceId];
+
+                // Check and collect physical overheating anomalies
+                if (device.is_oled && device.temperature >= 40.0) {
+                    overheatingNodes.push({ name: device.name, temp: device.temperature });
+                }
+
+                // Check and collect visual rendering driver exceptions
+                if (device.status === "COLOR_CRITICAL_FAULT" || device.status === "THERMAL_AND_FROZEN") {
+                    let exceptionType = device.decoder_fault ? device.decoder_fault : "PIPELINE_CORRUPTED";
+                    driverFaultNodes.push({ name: device.name, type: exceptionType });
+                }
+
+                // Check and collect framework matrix thread stalls
+                if (device.status === "STUCK/HANGING" || device.status === "THERMAL_AND_FROZEN") {
+                    frozenNodes.push(device.name);
+                }
+
+                // --- 4. RENDER INDIVIDUAL DISPLAY PLANE CARDS ---
+                let cardElement = document.getElementById(`card-${deviceId}`);
+                if (!cardElement) {
+                    cardElement = document.createElement("div");
+                    cardElement.id = `card-${deviceId}`;
+                    cardElement.className = "device-card bg-gray-800 border border-gray-700 rounded-lg overflow-hidden shadow-lg p-4";
+                    gridContainer.appendChild(cardElement);
+                    activeNodeSerials.add(deviceId);
+                    console.log(`[HOT-PLUG] Created DOM node element container for: ${deviceId}`);
+                }
+
+                // Establish Status Badge Color Strategy
+                let statusBadgeColor = "bg-green-500 text-white";
+                if (device.status === "STUCK/HANGING") statusBadgeColor = "bg-yellow-600 text-white animate-pulse";
+                if (device.status === "COLOR_CRITICAL_FAULT") statusBadgeColor = "bg-red-600 text-white animate-bounce";
+                if (device.status === "THERMAL_AND_FROZEN") statusBadgeColor = "bg-red-700 text-white animate-pulse border-2 border-yellow-400";
+                if (device.status === "STATIC") statusBadgeColor = "bg-blue-600 text-gray-100";
+
+                // Localize Device Border Alert State
+                if (device.temperature >= 40.0 || device.status === "STUCK/HANGING" || device.status === "COLOR_CRITICAL_FAULT" || device.status === "THERMAL_AND_FROZEN") {
+                    cardElement.classList.add("danger-border-red");
+                } else {
+                    cardElement.classList.remove("danger-border-red");
+                }
+
+                // Inject Card Dynamic Architecture Templates
+                cardElement.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <div>
+                            <h4 class="font-bold text-white text-base truncate max-w-xs">${device.name}</h4>
+                            <p class="text-xs text-gray-500 font-mono">${deviceId}</p>
+                        </div>
+                        <span class="text-xs px-2 py-0.5 rounded font-mono font-bold tracking-wide uppercase ${statusBadgeColor}">
+                            ${device.status}
+                        </span>
+                    </div>
+
+                    <div class="w-full bg-black flex items-center justify-center rounded overflow-hidden mb-3 border border-gray-900" style="height: 340px;">
+                        ${device.encoded_frame ? 
+                            `<img src="data:image/jpeg;base64,${device.encoded_frame}" class="w-full h-full object-contain" alt="Device Stream" />` : 
+                            `<div class="text-gray-600 text-xs font-mono">Awaiting Video Frame...</div>`
+                        }
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 text-xs font-mono bg-gray-900 p-2.5 rounded border border-gray-700">
+                        <div>
+                            <span class="text-gray-500">VELOCITY:</span> 
+                            <span class="text-blue-400 font-bold">${device.fps} FPS</span>
+                        </div>
+                        <div>
+                            <span class="text-gray-500">THERMAL:</span> 
+                            <span class="${device.temperature >= 40.0 ? 'text-red-400 font-bold animate-pulse' : 'text-orange-400'}">${device.temperature}°C</span>
+                        </div>
+                        <div class="col-span-2 border-t border-gray-800 pt-1 mt-1">
+                            <span class="text-gray-500">DELTA VAR:</span> 
+                            <span class="text-purple-400">${device.change_pct}%</span>
+                        </div>
+                        <div class="col-span-2 text-gray-400 text-[10px] truncate" title="${device.color_logs}">
+                            ${device.color_logs}
+                        </div>
+                    </div>
+                `;
+            });
+
+            // --- 5. INJECT COMBINED AGGREGATION TO MASTER TRIAGE DOM ---
+            
+            // Render Multi-Device Thermal Diagnostic Stream
+            const oledBox = document.getElementById("card-container-oled");
+            if (overheatingNodes.length > 0) {
+                oledBox.classList.add("danger-border-red");
+                document.getElementById("oled-health-panel").innerHTML = `
+                    <span style="color: #f56565; font-weight: bold;">⚠️ THERMAL ANOMALY (${overheatingNodes.length} Nodes)</span><br>
+                    <div class="mt-1 space-y-0.5 max-h-24 overflow-y-auto">
+                        ${overheatingNodes.map(n => `• Node <b>${n.name}</b> is running hot at <b style="color: #f56565;">${n.temp}°C</b>`).join('<br>')}
+                    </div>
+                `;
+            } else {
+                oledBox.classList.remove("danger-border-red");
+                document.getElementById("oled-health-panel").innerHTML = "<span class='text-green-400 font-bold'>✔</span> All active OLED array panels within nominal parameters.";
+            }
+
+            // Render Multi-Device Driver Exception Stream
+            const driverBox = document.getElementById("card-container-driver");
+            if (driverFaultNodes.length > 0) {
+                driverBox.classList.add("danger-border-red");
+                document.getElementById("driver-integrity-panel").innerHTML = `
+                    <span style="color: #e53e3e; font-weight: bold;">🚨 DRIVER EXCEPTIONS (${driverFaultNodes.length} Nodes)</span><br>
+                    <div class="mt-1 space-y-0.5 max-h-24 overflow-y-auto">
+                        ${driverFaultNodes.map(n => `• Node <b>${n.name}</b> signature: <b style="color: #e53e3e;">${n.type}</b>`).join('<br>')}
+                    </div>
+                `;
+            } else {
+                driverBox.classList.remove("danger-border-red");
+                document.getElementById("driver-integrity-panel").innerHTML = "<span class='text-green-400 font-bold'>✔</span> All active hardware rendering planes reporting operational driver states.";
+            }
+
+            // Render Multi-Device Frame Continuity Freeze Stream
+            const frameBox = document.getElementById("card-container-frame");
+            if (frozenNodes.length > 0) {
+                frameBox.classList.add("danger-border-yellow");
+                document.getElementById("frame-continuity-panel").innerHTML = `
+                    <span style="color: #d97706; font-weight: bold;">🛑 RENDERING FAILURES (${frozenNodes.length} Nodes)</span><br>
+                    <span class="text-xs text-gray-400">Stalled core matrix pipeline loops tracked on:</span><br>
+                    <b style="color: #d97706;" class="truncate block mt-0.5">${frozenNodes.join(', ')}</b>
+                `;
+            } else {
+                frameBox.classList.remove("danger-border-yellow");
+                document.getElementById("frame-continuity-panel").innerHTML = "Tracking frame-differencing velocity loops... <span class='text-green-400 font-bold'>Nominal</span>";
+            }
+        });
+    </script>
+</body>
+</html>
